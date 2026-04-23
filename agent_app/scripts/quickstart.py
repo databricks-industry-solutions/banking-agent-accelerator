@@ -13,10 +13,12 @@ Usage:
     uv run quickstart [OPTIONS]
 
 Options:
-    --profile NAME    Use specified Databricks profile (non-interactive)
-    --host URL        Databricks workspace URL (for initial setup)
-    --lakebase NAME   Lakebase instance name (for memory features)
-    -h, --help        Show this help message
+    --profile NAME      Use specified Databricks profile (non-interactive)
+    --host URL          Databricks workspace URL (for initial setup)
+    --lakebase NAME     Lakebase instance name (for memory features)
+    --no-chat-history   Skip Postgres env var wiring for the chatbot UI
+                        (leaves it in ephemeral mode; chats lost on restart)
+    -h, --help          Show this help message
 """
 
 import argparse
@@ -445,6 +447,51 @@ def validate_lakebase_instance(profile_name: str, lakebase_name: str) -> bool:
     return False
 
 
+def get_lakebase_host(profile_name: str, lakebase_name: str) -> str:
+    """Return the read_write_dns host for a Lakebase instance."""
+    result = run_command(
+        ["databricks", "-p", profile_name, "database",
+         "get-database-instance", lakebase_name, "--output", "json"],
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to read Lakebase instance '{lakebase_name}': "
+            f"{result.stderr.strip() if result.stderr else 'unknown error'}"
+        )
+    host = json.loads(result.stdout).get("read_write_dns", "")
+    if not host:
+        raise RuntimeError(
+            f"Lakebase instance '{lakebase_name}' has no read_write_dns yet. "
+            "The instance may still be provisioning — try again in a minute."
+        )
+    return host
+
+
+def setup_chat_history(profile_name: str, username: str, lakebase_name: str) -> None:
+    """Wire Postgres env vars so the chatbot UI persists chat history.
+
+    The chatbot UI (e2e-chatbot-app-next) reads PGHOST / PGUSER / PGDATABASE /
+    PGPORT to connect to Lakebase. Without them it falls back to ephemeral
+    mode and the 'chat history disabled' banner is shown.
+    """
+    print_step("Wiring chat-history env vars for the chatbot UI...")
+
+    try:
+        pghost = get_lakebase_host(profile_name, lakebase_name)
+    except RuntimeError as e:
+        print_error(str(e))
+        print("  Chat history will be disabled; re-run with --lakebase once the instance is ready.")
+        return
+
+    update_env_file("PGHOST", pghost)
+    update_env_file("PGUSER", username)
+    update_env_file("PGDATABASE", "databricks_postgres")
+    update_env_file("PGPORT", "5432")
+    print_success(f"Chat-history Postgres vars saved to .env (PGHOST={pghost})")
+    print("  The `ai_chatbot` schema is created on first `uv run start-app` via `npm run db:migrate`.")
+
+
 def setup_lakebase(profile_name: str, lakebase_arg: str = None) -> str:
     """Set up Lakebase instance for memory features."""
     print_step("Setting up Lakebase instance for memory...")
@@ -508,6 +555,12 @@ Examples:
         help="Lakebase instance name (for memory features)",
         metavar="NAME",
     )
+    parser.add_argument(
+        "--no-chat-history",
+        action="store_true",
+        help="Skip Postgres env var wiring for the chatbot UI "
+             "(leaves it in ephemeral mode)",
+    )
 
     args = parser.parse_args()
 
@@ -548,6 +601,11 @@ Examples:
         if lakebase_required:
             lakebase_name = setup_lakebase(profile_name, args.lakebase)
 
+        # Step 7: Chat history Postgres env vars (default on when Lakebase is in use)
+        chat_history_enabled = bool(lakebase_name) and not args.no_chat_history
+        if chat_history_enabled:
+            setup_chat_history(profile_name, username, lakebase_name)
+
         # Final summary
         print_header("Setup Complete!")
         summary = f"""
@@ -559,6 +617,8 @@ Examples:
 
         if lakebase_name:
             summary += f"\n✓ Lakebase instance: {lakebase_name}"
+        if chat_history_enabled:
+            summary += "\n✓ Chat-history Postgres env vars wired (PGHOST/PGUSER/PGDATABASE/PGPORT)"
 
         summary += """
 

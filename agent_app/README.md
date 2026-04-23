@@ -32,8 +32,9 @@ uv run start-app
 2. Walks you through Databricks OAuth (or uses an existing profile if you pass `--profile`).
 3. Creates an MLflow experiment under `/Users/<you>/agents-on-apps` and writes the ID to `.env`.
 4. Validates that the Lakebase instance exists (the quickstart does *not* create it — that's what `databricks bundle deploy` is for).
+5. Wires chat-history Postgres env vars (`PGHOST`, `PGUSER`, `PGDATABASE`, `PGPORT`) so the chatbot UI persists chats across restarts. Pass `--no-chat-history` to skip and run in ephemeral mode.
 
-`uv run start-app` starts the agent server and the chat app at http://localhost:8000.
+`uv run start-app` then installs chatbot dependencies, runs Drizzle migrations to create the `ai_chatbot` schema, and starts the agent server + chat UI at http://localhost:8000.
 
 > **Important:** `uv run quickstart` requires the Lakebase instance to already exist — it validates rather than creates. Run `databricks bundle deploy` first so the `banking-agent-memory` instance is provisioned. If you're customising the instance name, pass it to `--lakebase <name>` and update the `database_instances.agent_memory.name` field in `databricks.yml` to match.
 
