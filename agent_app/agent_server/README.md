@@ -243,6 +243,26 @@ curl -X POST http://localhost:8000/invocations \
   }'
 ```
 
+**Against the deployed Databricks App** (instead of `localhost:8000`), use the
+app URL and an OAuth bearer token. PATs are not accepted — Databricks Apps
+only honour OAuth U2M tokens ([docs](https://docs.databricks.com/aws/en/dev-tools/cli/authentication#u2m-auth)).
+
+```bash
+TOKEN=$(databricks auth token --profile <your-profile> | jq -r .access_token)
+APP_URL=https://<app-subdomain>.databricksapps.com
+
+curl -X POST "$APP_URL/invocations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": [{"role": "user", "content": "background check result"}],
+    "custom_inputs": {
+      "thread_id": "<thread-id>",
+      "background_check_result": { "status": "approved", "details": "Clear" }
+    }
+  }'
+```
+
 ### Delivering the result — Local testing only: CLI (checkpoint injection)
 
 `send_background_check.py` connects directly to the Lakebase checkpoint, bypassing the agent server entirely. It is intended for local development only.
