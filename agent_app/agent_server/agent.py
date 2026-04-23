@@ -42,6 +42,13 @@ def _notify_chat_app(thread_id: str) -> None:
 mlflow.langchain.autolog()
 _llm = ChatDatabricks(endpoint="databricks-claude-sonnet-4")
 LAKEBASE_INSTANCE_NAME = os.getenv("LAKEBASE_INSTANCE_NAME", "")
+# Dedicated Postgres schema for the LangGraph checkpointer. Using a
+# per-accelerator schema avoids the Postgres 14+ default where only the DB
+# owner can create objects in `public` — which blocks the deployed app's
+# service principal when `public` is owned by a different user. The schema
+# is auto-created on first setup(). Override with CHECKPOINT_SCHEMA if you
+# need to run several deployments of this accelerator in one database.
+CHECKPOINT_SCHEMA = os.getenv("CHECKPOINT_SCHEMA", "agent_checkpoints")
 _CHECKPOINTER_SETUP_DONE = False
 _CHECKPOINTER_SETUP_LOCK: Optional[asyncio.Lock] = None
 
@@ -110,14 +117,14 @@ async def streaming(
     bg_result = custom_inputs.get("background_check_result")
 
     if bg_result:
-        async with AsyncCheckpointSaver(instance_name=LAKEBASE_INSTANCE_NAME) as checkpointer:
+        async with AsyncCheckpointSaver(instance_name=LAKEBASE_INSTANCE_NAME, schema=CHECKPOINT_SCHEMA) as checkpointer:
             await _ensure_checkpointer_setup(checkpointer)
             graph = build_graph(checkpointer=checkpointer, llm=_llm)
             await graph.aupdate_state(config, {"background_check_result": bg_result})
         await asyncio.to_thread(_notify_chat_app, thread_id)
         return
 
-    async with AsyncCheckpointSaver(instance_name=LAKEBASE_INSTANCE_NAME) as checkpointer:
+    async with AsyncCheckpointSaver(instance_name=LAKEBASE_INSTANCE_NAME, schema=CHECKPOINT_SCHEMA) as checkpointer:
         await _ensure_checkpointer_setup(checkpointer)
         graph = build_graph(checkpointer=checkpointer, llm=_llm)
         async for event in process_agent_astream_events(

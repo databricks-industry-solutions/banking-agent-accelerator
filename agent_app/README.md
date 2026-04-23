@@ -190,6 +190,35 @@ serving endpoint. The `x-forwarded-access-token` header that
 deployed on Databricks Apps — for local development, keep the default
 `ChatDatabricks()` that uses your `DATABRICKS_CONFIG_PROFILE`.
 
+## Lakebase schema layout and ownership
+
+This accelerator creates three Postgres schemas in the bundle-provisioned
+Lakebase instance (`banking-agent-memory` by default):
+
+| Schema | Owner after first successful run | Purpose |
+|---|---|---|
+| `agent_checkpoints` | App service principal | LangGraph state, written by `AsyncCheckpointSaver` in `agent_server/agent.py`. Schema name is controlled by the `CHECKPOINT_SCHEMA` env var (default `agent_checkpoints`). |
+| `ai_chatbot` | Whoever runs the first migration | Chat UI's `User`/`Chat`/`Message` tables, written by Drizzle in the chatbot frontend. |
+| `drizzle` | Same as above | Drizzle's own migration-tracking metadata. |
+
+> **Important caveat for adopters.** If you run `uv run start-app` locally
+> *before* deploying to Databricks Apps, the `ai_chatbot` and `drizzle`
+> schemas will be owned by your user and the deployed app's service
+> principal will fail its migration with a Postgres permission error. You
+> have two options:
+>
+> 1. **Deploy first, local dev second.** Run `databricks bundle deploy &&
+>    databricks bundle run agent_langgraph` once so the SP creates both
+>    schemas. Then `uv run start-app` locally works because your user can
+>    read/write schemas the SP owns (via `CAN_CONNECT_AND_CREATE` on the
+>    database).
+> 2. **Reset the schemas** before the first deploy if you've already run
+>    locally: `DROP SCHEMA IF EXISTS ai_chatbot CASCADE; DROP SCHEMA IF
+>    EXISTS drizzle CASCADE;` and then redeploy. The SP will recreate them.
+>
+> The LangGraph checkpointer (`agent_checkpoints`) does not hit this
+> problem because it's a schema that neither user touches by default.
+
 ## Modifying your agent
 
 See the [LangGraph documentation](https://docs.langchain.com/oss/python/langgraph/quickstart) for more information on how to edit your own agent.

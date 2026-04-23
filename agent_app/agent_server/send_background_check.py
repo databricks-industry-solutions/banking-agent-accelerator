@@ -47,13 +47,14 @@ async def send_result(thread_id: str, status: str = "approved") -> None:
     if not instance_name:
         print("ERROR: LAKEBASE_INSTANCE_NAME env var is not set.", file=sys.stderr)
         sys.exit(1)
+    checkpoint_schema = os.getenv("CHECKPOINT_SCHEMA", "agent_checkpoints")
 
     bg_result = {
         "status": status,
         "details": f"Background check {status} (sent via CLI)",
     }
 
-    async with AsyncCheckpointSaver(instance_name=instance_name) as checkpointer:
+    async with AsyncCheckpointSaver(instance_name=instance_name, schema=checkpoint_schema) as checkpointer:
         await checkpointer.setup()
         graph = build_graph(checkpointer=checkpointer)
         config = {"configurable": {"thread_id": thread_id}}
