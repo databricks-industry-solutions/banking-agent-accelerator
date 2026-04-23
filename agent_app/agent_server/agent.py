@@ -5,6 +5,7 @@ import uuid
 from typing import AsyncGenerator, Optional
 
 import mlflow
+import psycopg
 from databricks_langchain.chat_models import ChatDatabricks
 from databricks_langchain.checkpoint import AsyncCheckpointSaver
 from mlflow.genai.agent_server import invoke, stream
@@ -116,33 +117,60 @@ async def streaming(
     }
     bg_result = custom_inputs.get("background_check_result")
 
-    if bg_result:
-        async with AsyncCheckpointSaver(instance_name=LAKEBASE_INSTANCE_NAME, schema=CHECKPOINT_SCHEMA) as checkpointer:
-            await _ensure_checkpointer_setup(checkpointer)
-            graph = build_graph(checkpointer=checkpointer, llm=_llm)
-            await graph.aupdate_state(config, {"background_check_result": bg_result})
-        await asyncio.to_thread(_notify_chat_app, thread_id)
-        return
-
-    async with AsyncCheckpointSaver(instance_name=LAKEBASE_INSTANCE_NAME, schema=CHECKPOINT_SCHEMA) as checkpointer:
-        await _ensure_checkpointer_setup(checkpointer)
-        graph = build_graph(checkpointer=checkpointer, llm=_llm)
-        async for event in process_agent_astream_events(
-            graph.astream(input_state, config, stream_mode=["updates", "messages"])
-        ):
-            yield event
-
+    # One-shot retry guards against a transient psycopg OperationalError that
+    # sometimes fires on the first Lakebase checkpoint write after a cold
+    # start ("SSL error: unexpected eof while reading"). We only retry when
+    # no events have been streamed to the client yet, so late failures still
+    # surface to the caller. TODO: replace with a process-level connection
+    # pool + explicit keepalive; this wrapper is a workaround, not the root
+    # cause.
+    for attempt in range(2):
+        events_yielded = 0
         try:
-            state = await graph.aget_state(config)
-            values = state.values
-            field_values = values.get("field_values") or {}
-            yield ResponsesAgentStreamEvent(
-                type="workflow.state.updated",
-                custom_outputs={
-                    "workflow_stage": values.get("stage", ""),
-                    "workflow_intent": values.get("intent", ""),
-                    "workflow_customer_name": field_values.get("customer_id", ""),
-                },
-            )
-        except Exception:
-            logger.exception("Failed to emit workflow metadata event")
+            if bg_result:
+                async with AsyncCheckpointSaver(
+                    instance_name=LAKEBASE_INSTANCE_NAME, schema=CHECKPOINT_SCHEMA,
+                ) as checkpointer:
+                    await _ensure_checkpointer_setup(checkpointer)
+                    graph = build_graph(checkpointer=checkpointer, llm=_llm)
+                    await graph.aupdate_state(
+                        config, {"background_check_result": bg_result}
+                    )
+                await asyncio.to_thread(_notify_chat_app, thread_id)
+                return
+
+            async with AsyncCheckpointSaver(
+                instance_name=LAKEBASE_INSTANCE_NAME, schema=CHECKPOINT_SCHEMA,
+            ) as checkpointer:
+                await _ensure_checkpointer_setup(checkpointer)
+                graph = build_graph(checkpointer=checkpointer, llm=_llm)
+                async for event in process_agent_astream_events(
+                    graph.astream(input_state, config, stream_mode=["updates", "messages"])
+                ):
+                    yield event
+                    events_yielded += 1
+
+                try:
+                    state = await graph.aget_state(config)
+                    values = state.values
+                    field_values = values.get("field_values") or {}
+                    yield ResponsesAgentStreamEvent(
+                        type="workflow.state.updated",
+                        custom_outputs={
+                            "workflow_stage": values.get("stage", ""),
+                            "workflow_intent": values.get("intent", ""),
+                            "workflow_customer_name": field_values.get("customer_id", ""),
+                        },
+                    )
+                    events_yielded += 1
+                except Exception:
+                    logger.exception("Failed to emit workflow metadata event")
+            return
+        except psycopg.OperationalError as exc:
+            if attempt == 0 and events_yielded == 0:
+                logger.warning(
+                    "Lakebase checkpoint connection dropped before any output; "
+                    "retrying once. Error: %s", exc,
+                )
+                continue
+            raise
