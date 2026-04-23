@@ -1,10 +1,14 @@
 # CODEOWNERS for databricks-industry-solutions/banking-agent-accelerator
 #
-# Per the FEIP / Industry Solutions guidelines, every public repo must have at
-# least two owners who are responsible for the security and legal compliance
-# of the content.
+# Per the FEIP / Industry Solutions guidelines, every public repo must have
+# at least two owners who are responsible for the security and legal
+# compliance of the content.
 #
-# TODO before publishing: add the second owner's GHEC (personal, non-EMU)
-# username in place of @TODO-second-owner.
+# Primary owner: Javier Poveda-Panter (PandaPover)
+# Secondary owner / technical reviewer: Anindita Mahapatra (FINS Industry
+# Lead SA — confirmed, GHEC username to be filled at sync next week).
+#
+# TODO before filing FEIP: replace @anindita-ghec-placeholder with
+# Anindita's personal (non-EMU) GHEC username.
 
-* @PandaPover @TODO-second-owner
+* @PandaPover @anindita-ghec-placeholder
