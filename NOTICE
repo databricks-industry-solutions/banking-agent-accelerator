@@ -1,0 +1,16 @@
+Databricks Industry Solutions — Deterministic Stateful Agent with Async
+Human-in-the-Loop
+
+Copyright (c) 2026 Databricks, Inc.
+
+This product includes software developed at Databricks (https://databricks.com).
+
+This accelerator depends on third-party open-source software. Complete
+attribution for bundled dependencies is available in the respective package
+manifests:
+
+  - agent_app/pyproject.toml
+  - agent_app/e2e-chatbot-app-next/package.json (and each workspace package.json)
+
+A summary of top-level dependencies and their licenses is provided in the
+"Dependencies and licenses" section of README.md.

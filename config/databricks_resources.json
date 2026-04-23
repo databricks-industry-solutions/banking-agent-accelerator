@@ -1,0 +1,10 @@
+{
+  "databricks_profile": "DEFAULT",
+  "default_cluster_id": "",
+  "default_sql_warehouse_id": "",
+  "lakebase": {
+    "type": "provisioned",
+    "name": "banking-agent-memory",
+    "instance_id": ""
+  }
+}
