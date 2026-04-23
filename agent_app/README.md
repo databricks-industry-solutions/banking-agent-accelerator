@@ -36,6 +36,10 @@ uv run start-app
 
 `uv run start-app` then installs chatbot dependencies, runs Drizzle migrations to create the `ai_chatbot` schema, and starts the agent server + chat UI at http://localhost:8000.
 
+> **Requires Databricks CLI ≥ 0.298.** Older versions fail `databricks bundle deploy` with `error downloading Terraform: openpgp: key expired`. Upgrade with `brew upgrade databricks/tap/databricks` (macOS) or the install script from the [Databricks CLI docs](https://docs.databricks.com/dev-tools/cli/install.html) (Linux).
+
+> **First-invocation delay.** The very first agent request triggers `AsyncCheckpointSaver.setup()`, which creates the LangGraph checkpoint tables in Lakebase. Expect 30-60s for that first request; subsequent requests return in under a second. If you're smoke-testing with `curl`, pass `--max-time 90` or longer on the first call.
+
 > **Important:** `uv run quickstart` requires the Lakebase instance to already exist — it validates rather than creates. Run `databricks bundle deploy` first so the `banking-agent-memory` instance is provisioned. If you're customising the instance name, pass it to `--lakebase <name>` and update the `database_instances.agent_memory.name` field in `databricks.yml` to match.
 
 **Next steps**: see [modifying your agent](#modifying-your-agent) to customize and iterate on the agent code.

@@ -107,7 +107,9 @@ Full setup, evaluation, and deployment instructions: [`agent_app/README.md`](age
 - Databricks workspace on AWS, Azure, or GCP with Unity Catalog enabled.
 - **Foundation Model API** enabled with the `databricks-claude-sonnet-4` endpoint reachable (the agent hardcodes this endpoint; swap the `ChatDatabricks(endpoint=...)` line in `agent_server/agent.py` to use a different one).
 - **Databricks Lakebase** available in the workspace. The `databricks bundle deploy` step above provisions the Postgres instance used as the LangGraph checkpoint store.
-- Local: `uv`, Node 20 via `nvm`, Databricks CLI (latest — the `databricks database` sub-command is recent).
+- Local: `uv`, Node 20 via `nvm`, and **Databricks CLI ≥ 0.298** (older versions fail bundle deploy with `error downloading Terraform: openpgp: key expired`; `brew upgrade databricks/tap/databricks` fixes it).
+
+> **First-run note.** The first time you send a message to the agent, `AsyncCheckpointSaver.setup()` runs the LangGraph checkpoint DDL against Lakebase. That can take 30-60s and will appear to hang if you're testing with `curl --max-time 3`. Subsequent requests return in under a second.
 
 ## Dependencies and licenses
 
