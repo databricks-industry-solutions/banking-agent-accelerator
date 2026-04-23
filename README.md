@@ -88,18 +88,26 @@ The framework — stage-driven routing, LLM-for-language/graph-for-flow split, c
 
 ```bash
 cd agent_app
-uv run quickstart   # authenticates, creates MLflow experiment, starts server + chat UI
+
+# 1. Provision the Lakebase checkpoint store (and register the app + MLflow
+#    experiment resources) via the Databricks Asset Bundle.
+databricks bundle deploy
+
+# 2. Authenticate, create the MLflow experiment, wire up .env.
+uv run quickstart --lakebase banking-agent-memory
+
+# 3. Start the agent server + chat UI locally on http://localhost:8000.
+uv run start-app
 ```
 
 Full setup, evaluation, and deployment instructions: [`agent_app/README.md`](agent_app/README.md).
 
 ## Prerequisites
 
-- Databricks workspace on AWS, Azure, or GCP
-- Unity Catalog enabled
-- A provisioned **Databricks Lakebase** Postgres instance (checkpoint storage)
-- A Databricks serving endpoint reachable by the agent (reference deploy uses `databricks-claude-sonnet-4`)
-- Local: `uv`, Node 20 via `nvm`, Databricks CLI
+- Databricks workspace on AWS, Azure, or GCP with Unity Catalog enabled.
+- **Foundation Model API** enabled with the `databricks-claude-sonnet-4` endpoint reachable (the agent hardcodes this endpoint; swap the `ChatDatabricks(endpoint=...)` line in `agent_server/agent.py` to use a different one).
+- **Databricks Lakebase** available in the workspace. The `databricks bundle deploy` step above provisions the Postgres instance used as the LangGraph checkpoint store.
+- Local: `uv`, Node 20 via `nvm`, Databricks CLI (latest — the `databricks database` sub-command is recent).
 
 ## Dependencies and licenses
 

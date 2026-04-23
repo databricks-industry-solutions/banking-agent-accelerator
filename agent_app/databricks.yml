@@ -2,6 +2,13 @@ bundle:
   name: agent_langgraph
 
 resources:
+  # Lakebase Postgres instance used as the LangGraph checkpointer
+  # (durable state for the deterministic state machine + async HIL flow).
+  database_instances:
+    agent_memory:
+      name: banking-agent-memory
+      capacity: CU_1
+
   # MLflow experiment for agent tracing - automatically created by bundle
   experiments:
     agent_langgraph_experiment:
@@ -21,7 +28,7 @@ resources:
             permission: 'CAN_MANAGE'
         - name: 'database'
           database:
-            instance_name: 'banking-agent-memory'
+            instance_name: ${resources.database_instances.agent_memory.name}
             database_name: 'postgres'
             permission: 'CAN_CONNECT_AND_CREATE'
 

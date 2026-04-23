@@ -12,26 +12,30 @@ We recommend using AI coding assistants (Claude Code, Cursor, GitHub Copilot) to
 
 ## Quick start
 
-Run the `uv run quickstart` script to quickly set up your local environment and start the agent server. At any step, if there are issues, refer to the manual local development loop setup below.
-
-This script will:
-
-1. Verify uv, nvm, and Databricks CLI installations
-2. Configure Databricks authentication
-3. Configure agent tracing, by creating and linking an MLflow experiment to your app
-4. Start the agent server and chat app
-
 ```bash
-uv run quickstart
-```
+# 1. Provision the Lakebase checkpoint store + register the app and MLflow
+#    experiment resources via the Databricks Asset Bundle. First run takes
+#    5-10 min while the Lakebase instance comes up.
+databricks bundle deploy
 
-After the setup is complete, you can start the agent server and the chat app locally with:
+# 2. Configure local authentication, create the MLflow experiment, wire up
+#    .env, and validate that the Lakebase instance from step 1 is reachable.
+uv run quickstart --lakebase banking-agent-memory
 
-```bash
+# 3. Start the agent server + chat UI locally.
 uv run start-app
 ```
 
-This will start the agent server and the chat app at http://localhost:8000.
+`uv run quickstart` does the following:
+
+1. Verifies `uv`, `nvm`/Node, and `databricks` CLI are installed.
+2. Walks you through Databricks OAuth (or uses an existing profile if you pass `--profile`).
+3. Creates an MLflow experiment under `/Users/<you>/agents-on-apps` and writes the ID to `.env`.
+4. Validates that the Lakebase instance exists (the quickstart does *not* create it — that's what `databricks bundle deploy` is for).
+
+`uv run start-app` starts the agent server and the chat app at http://localhost:8000.
+
+> **Important:** `uv run quickstart` requires the Lakebase instance to already exist — it validates rather than creates. Run `databricks bundle deploy` first so the `banking-agent-memory` instance is provisioned. If you're customising the instance name, pass it to `--lakebase <name>` and update the `database_instances.agent_memory.name` field in `databricks.yml` to match.
 
 **Next steps**: see [modifying your agent](#modifying-your-agent) to customize and iterate on the agent code.
 
