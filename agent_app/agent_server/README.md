@@ -168,7 +168,7 @@ Scenarios let tests exercise every error and edge-case branch without mocking.
 
 ## Async background check flow
 
-The `OPEN_DEPOSIT` workflow includes a mandatory background check that pauses the graph and resumes asynchronously when an external system delivers the result. This is implemented via **checkpoint injection** and an **internal webhook**.
+The `OPEN_DEPOSIT` workflow includes a mandatory background check that pauses the graph and resumes asynchronously when an external system delivers the result. The external system POSTs the result to `/invocations`; the handler writes it into the Lakebase checkpoint via `graph.aupdate_state()` and fires an **internal webhook** to the chat UI.
 
 ```mermaid
 sequenceDiagram
@@ -188,9 +188,11 @@ sequenceDiagram
 
     Note over External: Time passes...
 
-    External->>Checkpoint: graph.aupdate_state(background_check_result)
-    External->>ChatApp: POST /api/internal/background-check-received
+    External->>Agent: POST /invocations (background_check_result in custom_inputs)
+    Agent->>Checkpoint: graph.aupdate_state(background_check_result)
+    Agent->>ChatApp: POST /api/internal/background-check-received
     ChatApp->>ChatApp: update sidebar badge
+    Agent->>External: 200 (no LLM call)
 
     User->>Agent: next message
     Agent->>Graph: graph.astream() (loads checkpoint with result)
@@ -208,7 +210,7 @@ sequenceDiagram
 1. After all required fields are collected and the customer email is resolved, the graph enters `CUSTOMER_BACKGROUND_CHECK` and calls `submit_background_check()`, which returns a `request_id`.
 2. The graph transitions to `WAITING_FOR_BACKGROUND_CHECK` and exits to `END` — the conversation is paused.
 3. An external system delivers the result via one of two paths described below.
-4. Both paths call `graph.aupdate_state()` to write the result into the Lakebase checkpoint, then notify the chat app via `POST /api/internal/background-check-received` so the sidebar badge updates immediately.
+4. In both paths the agent-side code calls `graph.aupdate_state()` to write the result into the Lakebase checkpoint (the endpoint handler in the production path, the CLI script in the local-dev path), then notifies the chat app via `POST /api/internal/background-check-received` so the sidebar badge updates immediately.
 5. When the user sends their next message, the graph loads the checkpoint (which now contains the result) and routes to `customer_background_check_resume`, which either advances to `CONFIRM` (approved) or terminates at `DENIED`.
 
 ### Delivering the result — Production: Responses API

@@ -7,7 +7,7 @@ A reference implementation of a **deterministic, stage-driven LangGraph agent** 
 Most agent templates let the LLM decide the next step. That's flexible but non-auditable and unpredictable — unacceptable in regulated industries. This accelerator demonstrates a different approach:
 
 1. **Deterministic state machine** — the LLM handles language (intent classification, field extraction, free-form responses); a LangGraph state machine handles *all* control flow. The stage drives routing, the LLM never does.
-2. **Async human-in-the-loop via checkpoint injection** — the graph pauses at `WAITING_FOR_BACKGROUND_CHECK` and exits. An external system (compliance, fraud, credit bureau, anything slow) writes the result back into the Lakebase checkpoint using `graph.aupdate_state()`. The next user message transparently resumes the graph with the result in state.
+2. **Async human-in-the-loop via an endpoint-mediated checkpoint write** — the graph pauses at `WAITING_FOR_BACKGROUND_CHECK` and exits. An external system (compliance, fraud, credit bureau, anything slow) POSTs the result to the agent's `/invocations` endpoint with `custom_inputs.background_check_result`; the handler writes it into the LangGraph checkpoint in Lakebase via `graph.aupdate_state()` and returns immediately without an LLM call. The next user message transparently resumes the graph with the result in state.
 3. **Workflow-aware UI** — the chat UI surfaces the current stage, intent, and progress via a sidebar badge and filter, driven end-to-end by a `workflow.state.updated` SSE event.
 
 Together these give you an auditable agent that can safely block on minutes-to-hours-long external dependencies without holding a socket open, while keeping the chat UI responsive.
@@ -18,15 +18,18 @@ Together these give you an auditable agent that can safely block on minutes-to-h
 ┌────────────────┐     ┌────────────────────────┐     ┌────────────────────┐
 │  Next.js Chat  │◄───►│  MLflow AgentServer    │◄───►│  LangGraph state   │
 │  UI (workflow- │ SSE │  (@invoke / @stream)   │     │  machine           │
-│  aware sidebar)│     └──────────┬─────────────┘     │  (deterministic    │
-└────────────────┘                │                   │   routing)         │
-        ▲                         ▼                   └─────────┬──────────┘
-        │               ┌─────────────────────┐                 │
-        │ webhook       │  Lakebase Postgres  │◄────────────────┘
-        │               │  (LangGraph         │   checkpoint read/write
-        │               │  AsyncCheckpointer) │
-        │               └──────────▲──────────┘
-        │                          │ graph.aupdate_state(result)
+│  aware sidebar)│     └───┬───────────▲────────┘     │  (deterministic    │
+└────────────────┘         │           │              │   routing)         │
+        ▲                  ▼           │              └─────────┬──────────┘
+        │          ┌─────────────────────┐                      │
+        │ webhook  │  Lakebase Postgres  │◄─────────────────────┘
+        │          │  (LangGraph         │  checkpoint read/write
+        │          │  AsyncCheckpointer) │  (handler calls
+        │          └─────────────────────┘   graph.aupdate_state
+        │                          │         on bg_result POST)
+        │                          │
+        │                          │ POST /invocations with
+        │                          │ custom_inputs.background_check_result
 ┌───────┴──────────────────────────┴──────┐
 │  External async system                  │
 │  (compliance / fraud / credit bureau /  │
@@ -40,7 +43,7 @@ Three architectural choices make this work:
 |---|---|---|
 | Agent control flow | LangGraph with `_route_by_stage` conditional edge | Every transition is named, testable, and auditable. LLM output never changes the graph's next step. |
 | Checkpointing | Databricks Lakebase Postgres via `AsyncCheckpointSaver` | Serverless managed Postgres; survives restarts; supports concurrent async writes from external systems. |
-| HIL resume | External system calls `graph.aupdate_state()` + an internal webhook | No long-lived sockets, no polling; the next user message picks up the injected result from the checkpoint. |
+| HIL resume | External system POSTs the result to `/invocations`; the handler calls `graph.aupdate_state()` to write into Lakebase and fires an internal webhook to the chat UI | No long-lived sockets, no polling; the next user message picks up the injected result from the checkpoint. |
 
 For a full state-machine diagram and stage-by-stage walkthrough see [`agent_app/agent_server/README.md`](agent_app/agent_server/README.md).
 

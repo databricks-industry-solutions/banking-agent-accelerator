@@ -46,7 +46,7 @@ uv run start-app
 
 ## Architecture
 
-For a detailed walkthrough of how the agent server works internally (state machine, tool stubs, request flow, and testing), see [`agent_server/README.md`](agent_server/README.md). This includes the async background check flow, which uses checkpoint injection and internal webhooks to pause the graph while waiting for an external result and resume automatically when it arrives.
+For a detailed walkthrough of how the agent server works internally (state machine, tool stubs, request flow, and testing), see [`agent_server/README.md`](agent_server/README.md). This includes the async background check flow: the graph pauses waiting for an external result and resumes on the next user message, where the external system POSTs the result to `/invocations` and the handler writes it into the Lakebase checkpoint via `graph.aupdate_state()`.
 
 ## Manual local development loop setup
 
