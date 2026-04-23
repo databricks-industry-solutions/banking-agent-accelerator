@@ -31,6 +31,16 @@ resources:
             instance_name: ${resources.database_instances.agent_memory.name}
             database_name: 'databricks_postgres'
             permission: 'CAN_CONNECT_AND_CREATE'
+        # Foundation Model endpoint used by the agent (see agent_server/agent.py).
+        # Grants CAN_QUERY to the app's service principal so the agent can call
+        # the model when deployed. For an on-behalf-of-user (OBO) setup where
+        # each user hits the endpoint with their own token, remove this
+        # binding and refactor the ChatDatabricks instantiation per the
+        # "Advanced: on-behalf-of-user auth" section of agent_app/README.md.
+        - name: 'llm_endpoint'
+          serving_endpoint:
+            name: 'databricks-claude-sonnet-4'
+            permission: 'CAN_QUERY'
 
 targets:
   dev:

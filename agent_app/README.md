@@ -142,6 +142,54 @@ For a detailed walkthrough of how the agent server works internally (state machi
      -d '{ "input": [{ "role": "user", "content": "hi" }] }'
      ```
 
+## Advanced: on-behalf-of-user (OBO) auth for the LLM endpoint
+
+By default the deployed app uses its **service principal** to call
+`databricks-claude-sonnet-4` — the `databricks.yml` in this repo grants the
+SP `CAN_QUERY` on that endpoint. That's the simplest pattern and the one
+Industry Solution Accelerator adopters are used to.
+
+If you'd rather have each request hit the endpoint **as the requesting
+user** — useful for a shared demo where you want per-user quota and no SP
+grants — swap to on-behalf-of (OBO) auth in two steps.
+
+**1. Remove the SP grant** from `databricks.yml`. Delete the
+`llm_endpoint` resource binding under `apps.agent_langgraph.resources`:
+
+```yaml
+# Delete this block for OBO:
+- name: 'llm_endpoint'
+  serving_endpoint:
+    name: 'databricks-claude-sonnet-4'
+    permission: 'CAN_QUERY'
+```
+
+**2. Instantiate `ChatDatabricks` per-request using the user's workspace
+client** in `agent_server/agent.py`. Replace the module-level
+`_llm = ChatDatabricks(...)` with a helper that pulls the forwarded user
+token from `agent_server.utils.get_user_workspace_client()`:
+
+```python
+from databricks_langchain.chat_models import ChatDatabricks
+from agent_server.utils import get_user_workspace_client
+
+def _make_llm() -> ChatDatabricks:
+    user_client = get_user_workspace_client()
+    return ChatDatabricks(
+        endpoint="databricks-claude-sonnet-4",
+        client=user_client,
+    )
+```
+
+Then call `_make_llm()` inside `streaming()` / `non_streaming()` and pass
+the result into `build_graph(checkpointer=..., llm=_make_llm())`.
+
+Every user of the deployed app must themselves have `CAN_QUERY` on the
+serving endpoint. The `x-forwarded-access-token` header that
+`get_user_workspace_client()` reads is only injected when the app is
+deployed on Databricks Apps — for local development, keep the default
+`ChatDatabricks()` that uses your `DATABRICKS_CONFIG_PROFILE`.
+
 ## Modifying your agent
 
 See the [LangGraph documentation](https://docs.langchain.com/oss/python/langgraph/quickstart) for more information on how to edit your own agent.
