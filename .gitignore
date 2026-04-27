@@ -9,6 +9,7 @@
 
 # OS files
 .DS_Store
+**/.DS_Store
 Thumbs.db
 
 # Python
@@ -24,4 +25,6 @@ build/
 
 # Environment files
 .env
-.env.local 
+.env.local
+.env.*.local
+!.env.example
