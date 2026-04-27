@@ -147,7 +147,7 @@ For a detailed walkthrough of how the agent server works internally (state machi
 By default the deployed app uses its **service principal** to call
 `databricks-claude-sonnet-4` — the `databricks.yml` in this repo grants the
 SP `CAN_QUERY` on that endpoint. That's the simplest pattern and the one
-Industry Solution Accelerator adopters are used to.
+Databricks Industry Solution Accelerator users are used to.
 
 If you'd rather have each request hit the endpoint **as the requesting
 user** — useful for a shared demo where you want per-user quota and no SP

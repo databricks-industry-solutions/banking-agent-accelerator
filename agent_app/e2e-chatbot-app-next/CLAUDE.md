@@ -612,7 +612,6 @@ resources:
 ## Repository Etiquette
 
 - **Main branch**: `main`
-- **Current branch**: `remove-nextjs` (feature branch)
 - **Commit messages**: Concise, imperative mood
 - **Testing**: Run `npm test` before committing
 - **Linting**: Run `npm run lint` to auto-fix issues
