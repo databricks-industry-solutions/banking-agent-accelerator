@@ -46,8 +46,8 @@ const STAGE_STEP: Record<string, number> = {
 const TOTAL_STEPS = 8;
 
 const INTENT_LABELS: Record<string, string> = {
-  GENERATE_ACCOUNT_STATEMENT: 'Statement',
-  OPEN_DEPOSIT: 'Deposit',
+  ADD_BENEFICIARY: 'Beneficiary',
+  REQUEST_CREDIT_LIMIT_INCREASE: 'Credit Limit',
 };
 
 function WorkflowBadges({ chat }: { chat: Chat }) {

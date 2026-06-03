@@ -22,7 +22,7 @@ export const Greeting = () => {
         transition={{ delay: 0.6 }}
         className="text-xl text-zinc-500 md:text-2xl"
       >
-        Which private banking action can I support you with today?
+        Which banking action can I support you with today?
       </motion.div>
     </div>
   );

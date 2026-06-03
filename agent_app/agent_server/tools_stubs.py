@@ -23,10 +23,10 @@ def classify_intent(text: str, *, scenario: str = "happy_path") -> dict[str, Any
         return {"intent": "UNKNOWN", "confidence": 0.0}
 
     lower = text.lower()
-    if "statement" in lower:
-        intent = "GENERATE_ACCOUNT_STATEMENT"
-    elif "deposit" in lower:
-        intent = "OPEN_DEPOSIT"
+    if "beneficiary" in lower or "payee" in lower:
+        intent = "ADD_BENEFICIARY"
+    elif "credit" in lower or "limit" in lower:
+        intent = "REQUEST_CREDIT_LIMIT_INCREASE"
     else:
         intent = "UNKNOWN"
 
@@ -39,47 +39,49 @@ def classify_intent(text: str, *, scenario: str = "happy_path") -> dict[str, Any
 # ---------------------------------------------------------------------------
 
 _TEMPLATES: dict[str, dict[str, Any]] = {
-    "GENERATE_ACCOUNT_STATEMENT": {
-        "template_id": "tmpl-account-statement-v1",
+    "ADD_BENEFICIARY": {
+        "template_id": "tmpl-add-beneficiary-v1",
         "required_fields": [
             "customer_id",
-            "account_id",
-            "period_start",
-            "period_end",
+            "beneficiary_name",
+            "beneficiary_account",
+            "sort_code",
         ],
         "template_body": (
             "Dear {{customer_id}},\n\n"
-            "Please find attached your account statement for "
-            "{{account_id}} covering {{period_start}} to {{period_end}}."
+            "We have added {{beneficiary_name}} (account "
+            "{{beneficiary_account}}, sort code {{sort_code}}) as a payee "
+            "on your account."
         ),
     },
-    "OPEN_DEPOSIT": {
-        "template_id": "tmpl-open-deposit-v1",
+    "REQUEST_CREDIT_LIMIT_INCREASE": {
+        "template_id": "tmpl-credit-limit-increase-v1",
         "required_fields": [
             "customer_id",
+            "card_id",
             "amount",
             "currency",
-            "term_months",
-            "payout_account",
+            "reason",
         ],
         "template_body": (
             "Dear {{customer_id}},\n\n"
-            "We have opened a deposit of {{amount}} {{currency}} "
-            "for {{term_months}} months. Payouts go to {{payout_account}}."
+            "We have received your request to increase the credit limit on "
+            "card {{card_id}} to {{amount}} {{currency}}. "
+            "Reason: {{reason}}."
         ),
     },
 }
 
 
 _FIELD_LABELS: dict[str, str] = {
-    "customer_id":    "Customer ID",
-    "account_id":     "Account ID",
-    "period_start":   "Statement start date",
-    "period_end":     "Statement end date",
-    "amount":         "Deposit amount",
-    "currency":       "Currency",
-    "term_months":    "Term (months)",
-    "payout_account": "Payout account",
+    "customer_id":         "Customer ID",
+    "beneficiary_name":    "Beneficiary name",
+    "beneficiary_account": "Beneficiary account number",
+    "sort_code":           "Sort code",
+    "card_id":             "Card ID",
+    "amount":              "Requested credit limit",
+    "currency":            "Currency",
+    "reason":              "Reason for request",
 }
 
 
@@ -160,8 +162,8 @@ def lookup_customer_email(
 # ---------------------------------------------------------------------------
 
 _SUBJECT_LABELS: dict[str, str] = {
-    "tmpl-account-statement-v1": "Your Account Statement",
-    "tmpl-open-deposit-v1": "Your Deposit Confirmation",
+    "tmpl-add-beneficiary-v1": "New Payee Added",
+    "tmpl-credit-limit-increase-v1": "Your Credit Limit Increase Request",
 }
 
 _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")

@@ -17,8 +17,8 @@ function PureSuggestedActions({ chatId, sendMessage }: SuggestedActionsProps) {
   const { chatHistoryEnabled } = useAppConfig();
   const suggestedActions = [
     'How can you help me?',
-    'Open Deposit',
-    'Generate Account Statement',
+    'Request a credit limit increase',
+    'Add a new beneficiary',
   ];
 
   return (

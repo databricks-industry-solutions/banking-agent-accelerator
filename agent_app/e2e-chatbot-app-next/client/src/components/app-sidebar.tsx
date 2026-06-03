@@ -39,7 +39,7 @@ export function AppSidebar({
               className="flex flex-row items-center gap-3"
             >
               <span className="cursor-pointer rounded-md px-2 font-semibold text-lg hover:bg-muted">
-                Private Banking Assistant
+                Banking Assistant
               </span>
             </Link>
             <Tooltip>
