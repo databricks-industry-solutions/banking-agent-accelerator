@@ -96,7 +96,7 @@ The state is a `TypedDict` with the following fields:
 | ------------------ | ---------------- | ------------------------------------------------------------------ |
 | `messages`         | `list`           | Conversation history (uses LangGraph's `add_messages` reducer)     |
 | `stage`            | `str`            | Current workflow stage (drives all routing)                        |
-| `intent`           | `str`            | Classified intent (`GENERATE_ACCOUNT_STATEMENT` or `OPEN_DEPOSIT`) |
+| `intent`           | `str`            | Classified intent (`ADD_BENEFICIARY` or `REQUEST_CREDIT_LIMIT_INCREASE`) |
 | `required_fields`  | `list[str]`      | Fields required by the selected template                           |
 | `field_values`     | `dict[str, str]` | Collected field values so far                                      |
 | `missing_fields`   | `list[str]`      | Fields still needed from the user                                  |
@@ -116,8 +116,8 @@ The state is a `TypedDict` with the following fields:
 
 ### Supported intents
 
-- `**GENERATE_ACCOUNT_STATEMENT**` — requires `customer_id`, `account_id`, `period_start`, `period_end`
-- `**OPEN_DEPOSIT**` — requires `customer_id`, `amount`, `currency`, `term_months`, `payout_account`
+- `**ADD_BENEFICIARY**` — requires `customer_id`, `beneficiary_name`, `beneficiary_account`, `sort_code`
+- `**REQUEST_CREDIT_LIMIT_INCREASE**` — requires `customer_id`, `card_id`, `amount`, `currency`, `reason`
 
 ## LLM vs. stub duality
 
@@ -126,7 +126,7 @@ The state is a `TypedDict` with the following fields:
 
 | Capability             | With LLM                                                              | Without LLM (stubs only)                                              |
 | ---------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Intent classification  | `_llm_classify_intent` — LLM returns JSON with intent                 | `classify_intent` stub — substring matching ("statement" / "deposit") |
+| Intent classification  | `_llm_classify_intent` — LLM returns JSON with intent                 | `classify_intent` stub — substring matching ("beneficiary"/"payee" / "credit"/"limit") |
 | Field extraction       | `_llm_extract_fields` — LLM parses natural language into field values | `extract_fields` stub — regex `key=value` / JSON parsing              |
 | Message classification | `_llm_classify_message` — LLM decides question vs. workflow data      | Always returns `False` (treat everything as workflow data)            |
 | User-facing responses  | `_llm_generate_response` — LLM generates natural-language replies     | `_format_status_preamble` — deterministic field checklist             |
@@ -141,7 +141,7 @@ Every function in `tools_stubs.py` accepts a `scenario` keyword argument (defaul
 
 | Tool                                                | What it does                                                     |
 | --------------------------------------------------- | ---------------------------------------------------------------- |
-| `classify_intent(text)`                             | Substring-based intent detection (statement / deposit / unknown) |
+| `classify_intent(text)`                             | Substring-based intent detection (beneficiary / credit limit / unknown) |
 | `get_template(intent)`                              | Returns template with `required_fields` and `template_body`      |
 | `extract_fields(text, required_fields)`             | Parses `key=value` pairs or JSON from user text                  |
 | `lookup_customer_email(customer_id)`                | Returns a fake email address                                     |
@@ -168,7 +168,7 @@ Scenarios let tests exercise every error and edge-case branch without mocking.
 
 ## Async background check flow
 
-The `OPEN_DEPOSIT` workflow includes a mandatory background check that pauses the graph and resumes asynchronously when an external system delivers the result. The external system POSTs the result to `/invocations`; the handler writes it into the Lakebase checkpoint via `graph.aupdate_state()` and fires an **internal webhook** to the chat UI.
+The `REQUEST_CREDIT_LIMIT_INCREASE` workflow includes a mandatory background check that pauses the graph and resumes asynchronously when an external system delivers the result. The external system POSTs the result to `/invocations`; the handler writes it into the Lakebase checkpoint via `graph.aupdate_state()` and fires an **internal webhook** to the chat UI.
 
 ```mermaid
 sequenceDiagram
@@ -296,12 +296,12 @@ The tests use LangGraph's `MemorySaver` as the checkpointer instead of `AsyncChe
 
 | Test                                           | What it verifies                                                                                         |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `test_happy_path`                              | Full account-statement flow: classify intent, provide all fields, confirm, send                          |
+| `test_happy_path`                              | Full add-beneficiary flow: classify intent, provide all fields, confirm, send                            |
 | `test_missing_fields_loop`                     | Partial fields trigger re-ask; providing remaining fields advances the workflow                          |
 | `test_confirmation_gating`                     | Sending field changes instead of "SEND" at the preview stage does not trigger email delivery             |
 | `test_natural_confirm_words`                   | Confirmation phrases like "go ahead", "ok", "sure", "looks good" all trigger send                        |
 | `test_change_customer_id_at_send_email`        | Changing `customer_id` at the preview stage re-looks up the email address                                |
-| `test_open_deposit_incremental_fields`         | `OPEN_DEPOSIT` flow with fields provided across multiple turns                                           |
+| `test_credit_limit_incremental_fields`         | `REQUEST_CREDIT_LIMIT_INCREASE` flow with fields provided across multiple turns                          |
 | `test_change_non_customer_field_at_send_email` | Changing a non-identity field (e.g. `amount`) at preview updates the preview without re-looking up email |
 | `test_background_check_happy_path`             | Full flow: submit background check, wait, inject approved result, resume to CONFIRM and complete         |
 | `test_background_check_waiting_blocks_user`    | User messages while in `WAITING_FOR_BACKGROUND_CHECK` do not advance the workflow                        |

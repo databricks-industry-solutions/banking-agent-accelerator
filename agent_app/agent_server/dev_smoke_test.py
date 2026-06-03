@@ -44,25 +44,25 @@ async def _inject_background_check(graph, config, status="approved"):
 
 
 async def test_happy_path() -> None:
-    """Full account-statement flow: classify -> fields -> bg check -> confirm -> send."""
+    """Full add-beneficiary flow: classify -> fields -> bg check -> confirm -> send."""
     print("=== Happy path ===")
     graph = build_graph(checkpointer=MemorySaver())
     config = {"configurable": {"thread_id": "happy-1"}}
 
     # Turn 1: intent
     state = await graph.ainvoke(
-        {**_user_msg("Generate account statement"), "stub_scenario": "happy_path"},
+        {**_user_msg("Add a new beneficiary"), "stub_scenario": "happy_path"},
         config,
     )
     assert state["stage"] == "EXTRACT_FIELDS", f"Expected EXTRACT_FIELDS, got {state['stage']}"
-    assert state["intent"] == "GENERATE_ACCOUNT_STATEMENT"
+    assert state["intent"] == "ADD_BENEFICIARY"
     print(f"  Turn 1  stage={state['stage']}")
 
     # Turn 2: provide all fields -> background check submitted, graph pauses
     state = await graph.ainvoke(
         {
             **_user_msg(
-                "customer_id=C001 account_id=A100 period_start=2025-01-01 period_end=2025-12-31"
+                "customer_id=C001 beneficiary_name=JaneDoe beneficiary_account=BEN100 sort_code=20-30-40"
             ),
             "stub_scenario": "happy_path",
         },
@@ -100,26 +100,26 @@ async def test_missing_fields_loop() -> None:
 
     # Turn 1: intent
     state = await graph.ainvoke(
-        {**_user_msg("I need an account statement"), "stub_scenario": "happy_path"},
+        {**_user_msg("I want to add a payee"), "stub_scenario": "happy_path"},
         config,
     )
     assert state["stage"] == "EXTRACT_FIELDS"
     assert len(state["missing_fields"]) == 4
     print(f"  Turn 1  stage={state['stage']}  missing={state['missing_fields']}")
 
-    # Turn 2: partial -- only customer_id and account_id
+    # Turn 2: partial -- only customer_id and beneficiary_name
     state = await graph.ainvoke(
-        {**_user_msg("customer_id=C002 account_id=A200"), "stub_scenario": "happy_path"},
+        {**_user_msg("customer_id=C002 beneficiary_name=JohnDoe"), "stub_scenario": "happy_path"},
         config,
     )
     assert state["stage"] == "EXTRACT_FIELDS", f"Expected EXTRACT_FIELDS, got {state['stage']}"
-    assert set(state["missing_fields"]) == {"period_start", "period_end"}
+    assert set(state["missing_fields"]) == {"beneficiary_account", "sort_code"}
     print(f"  Turn 2  stage={state['stage']}  missing={state['missing_fields']}")
 
     # Turn 3: provide remaining fields -> waiting for background check
     state = await graph.ainvoke(
         {
-            **_user_msg("period_start=2025-01-01 period_end=2025-06-30"),
+            **_user_msg("beneficiary_account=BEN200 sort_code=11-22-33"),
             "stub_scenario": "happy_path",
         },
         config,
@@ -153,7 +153,7 @@ async def test_confirmation_gating() -> None:
 
     # Turn 1: intent
     state = await graph.ainvoke(
-        {**_user_msg("Generate account statement"), "stub_scenario": "happy_path"},
+        {**_user_msg("Add a new beneficiary"), "stub_scenario": "happy_path"},
         config,
     )
 
@@ -161,7 +161,7 @@ async def test_confirmation_gating() -> None:
     state = await graph.ainvoke(
         {
             **_user_msg(
-                "customer_id=C003 account_id=A300 period_start=2025-01-01 period_end=2025-12-31"
+                "customer_id=C003 beneficiary_name=JaneDoe beneficiary_account=BEN300 sort_code=20-30-40"
             ),
             "stub_scenario": "happy_path",
         },
@@ -176,13 +176,13 @@ async def test_confirmation_gating() -> None:
 
     # Turn 4: change a field instead of confirming -> triggers new background check
     state = await graph.ainvoke(
-        {**_user_msg("period_end=2025-06-30"), "stub_scenario": "happy_path"},
+        {**_user_msg("sort_code=99-88-77"), "stub_scenario": "happy_path"},
         config,
     )
     assert state["stage"] != "DONE", "Graph must NOT send when user specifies changes"
-    assert state["field_values"]["period_end"] == "2025-06-30"
+    assert state["field_values"]["sort_code"] == "99-88-77"
     print(
-        f"  Turn 4  stage={state['stage']}  period_end={state['field_values']['period_end']}"
+        f"  Turn 4  stage={state['stage']}  sort_code={state['field_values']['sort_code']}"
         f"  (change accepted, not sent)"
     )
 
@@ -210,7 +210,7 @@ async def test_natural_confirm_words() -> None:
 
         # Turn 1: intent
         await graph.ainvoke(
-            {**_user_msg("Generate account statement"), "stub_scenario": "happy_path"},
+            {**_user_msg("Add a new beneficiary"), "stub_scenario": "happy_path"},
             config,
         )
 
@@ -218,8 +218,8 @@ async def test_natural_confirm_words() -> None:
         state = await graph.ainvoke(
             {
                 **_user_msg(
-                    "customer_id=C010 account_id=A110 "
-                    "period_start=2025-01-01 period_end=2025-12-31"
+                    "customer_id=C010 beneficiary_name=JaneDoe "
+                    "beneficiary_account=BEN110 sort_code=20-30-40"
                 ),
                 "stub_scenario": "happy_path",
             },
@@ -256,7 +256,7 @@ async def test_change_customer_id_at_send_email() -> None:
 
     # Turn 1: intent
     await graph.ainvoke(
-        {**_user_msg("Generate account statement"), "stub_scenario": "happy_path"},
+        {**_user_msg("Add a new beneficiary"), "stub_scenario": "happy_path"},
         config,
     )
 
@@ -264,8 +264,8 @@ async def test_change_customer_id_at_send_email() -> None:
     state = await graph.ainvoke(
         {
             **_user_msg(
-                "customer_id=C001 account_id=A100 "
-                "period_start=2025-01-01 period_end=2025-12-31"
+                "customer_id=C001 beneficiary_name=JaneDoe "
+                "beneficiary_account=BEN100 sort_code=20-30-40"
             ),
             "stub_scenario": "happy_path",
         },
@@ -307,38 +307,38 @@ async def test_change_customer_id_at_send_email() -> None:
     print("  PASSED\n")
 
 
-async def test_open_deposit_incremental_fields() -> None:
-    """OPEN_DEPOSIT: provide fields incrementally and reach email preview."""
-    print("=== Open deposit incremental fields ===")
+async def test_credit_limit_incremental_fields() -> None:
+    """REQUEST_CREDIT_LIMIT_INCREASE: provide fields incrementally and reach email preview."""
+    print("=== Credit limit incremental fields ===")
     graph = build_graph(checkpointer=MemorySaver())
-    config = {"configurable": {"thread_id": "deposit-1"}}
+    config = {"configurable": {"thread_id": "creditlimit-1"}}
 
     # Turn 1: intent
     state = await graph.ainvoke(
-        {**_user_msg("I want to open a deposit"), "stub_scenario": "happy_path"},
+        {**_user_msg("I want to request a credit limit increase"), "stub_scenario": "happy_path"},
         config,
     )
     assert state["stage"] == "EXTRACT_FIELDS", f"Expected EXTRACT_FIELDS, got {state['stage']}"
-    assert state["intent"] == "OPEN_DEPOSIT"
+    assert state["intent"] == "REQUEST_CREDIT_LIMIT_INCREASE"
     assert len(state["missing_fields"]) == 5
     print(f"  Turn 1  stage={state['stage']}  missing={state['missing_fields']}")
 
-    # Turn 2: partial -- customer_id, amount, currency
+    # Turn 2: partial -- customer_id, card_id, amount
     state = await graph.ainvoke(
         {
-            **_user_msg("customer_id=C100 amount=5000 currency=EUR"),
+            **_user_msg("customer_id=C100 card_id=CARD1 amount=5000"),
             "stub_scenario": "happy_path",
         },
         config,
     )
     assert state["stage"] == "EXTRACT_FIELDS", f"Expected EXTRACT_FIELDS, got {state['stage']}"
-    assert set(state["missing_fields"]) == {"term_months", "payout_account"}
+    assert set(state["missing_fields"]) == {"currency", "reason"}
     print(f"  Turn 2  stage={state['stage']}  missing={state['missing_fields']}")
 
     # Turn 3: provide remaining fields -> waiting
     state = await graph.ainvoke(
         {
-            **_user_msg("term_months=12 payout_account=ACC999"),
+            **_user_msg("currency=EUR reason=Travel"),
             "stub_scenario": "happy_path",
         },
         config,
@@ -374,7 +374,7 @@ async def test_change_non_customer_field_at_send_email() -> None:
 
     # Turn 1: intent
     await graph.ainvoke(
-        {**_user_msg("I want to open a deposit"), "stub_scenario": "happy_path"},
+        {**_user_msg("I want to request a credit limit increase"), "stub_scenario": "happy_path"},
         config,
     )
 
@@ -382,8 +382,8 @@ async def test_change_non_customer_field_at_send_email() -> None:
     state = await graph.ainvoke(
         {
             **_user_msg(
-                "customer_id=C100 amount=5000 currency=EUR "
-                "term_months=12 payout_account=ACC999"
+                "customer_id=C100 card_id=CARD1 amount=5000 "
+                "currency=EUR reason=Travel"
             ),
             "stub_scenario": "happy_path",
         },
@@ -438,7 +438,7 @@ async def test_background_check_happy_path() -> None:
 
     # Turn 1: intent
     state = await graph.ainvoke(
-        {**_user_msg("Generate account statement"), "stub_scenario": "happy_path"},
+        {**_user_msg("Add a new beneficiary"), "stub_scenario": "happy_path"},
         config,
     )
     assert state["stage"] == "EXTRACT_FIELDS"
@@ -448,8 +448,8 @@ async def test_background_check_happy_path() -> None:
     state = await graph.ainvoke(
         {
             **_user_msg(
-                "customer_id=C050 account_id=A500 "
-                "period_start=2025-01-01 period_end=2025-12-31"
+                "customer_id=C050 beneficiary_name=JaneDoe "
+                "beneficiary_account=BEN500 sort_code=20-30-40"
             ),
             "stub_scenario": "happy_path",
         },
@@ -487,7 +487,7 @@ async def test_background_check_waiting_blocks_user() -> None:
 
     # Turn 1: intent
     await graph.ainvoke(
-        {**_user_msg("Generate account statement"), "stub_scenario": "happy_path"},
+        {**_user_msg("Add a new beneficiary"), "stub_scenario": "happy_path"},
         config,
     )
 
@@ -495,8 +495,8 @@ async def test_background_check_waiting_blocks_user() -> None:
     state = await graph.ainvoke(
         {
             **_user_msg(
-                "customer_id=C060 account_id=A600 "
-                "period_start=2025-01-01 period_end=2025-12-31"
+                "customer_id=C060 beneficiary_name=JaneDoe "
+                "beneficiary_account=BEN600 sort_code=20-30-40"
             ),
             "stub_scenario": "happy_path",
         },
@@ -532,7 +532,7 @@ async def test_background_check_denied() -> None:
 
     # Turn 1: intent
     state = await graph.ainvoke(
-        {**_user_msg("Generate account statement"), "stub_scenario": "happy_path"},
+        {**_user_msg("Add a new beneficiary"), "stub_scenario": "happy_path"},
         config,
     )
     assert state["stage"] == "EXTRACT_FIELDS"
@@ -542,8 +542,8 @@ async def test_background_check_denied() -> None:
     state = await graph.ainvoke(
         {
             **_user_msg(
-                "customer_id=C070 account_id=A700 "
-                "period_start=2025-01-01 period_end=2025-12-31"
+                "customer_id=C070 beneficiary_name=JaneDoe "
+                "beneficiary_account=BEN700 sort_code=20-30-40"
             ),
             "stub_scenario": "happy_path",
         },
@@ -585,7 +585,7 @@ async def _run_all() -> None:
     await test_confirmation_gating()
     await test_natural_confirm_words()
     await test_change_customer_id_at_send_email()
-    await test_open_deposit_incremental_fields()
+    await test_credit_limit_incremental_fields()
     await test_change_non_customer_field_at_send_email()
     await test_background_check_happy_path()
     await test_background_check_waiting_blocks_user()

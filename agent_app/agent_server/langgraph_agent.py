@@ -63,8 +63,8 @@ class WorkflowState(TypedDict):
 # ---------------------------------------------------------------------------
 
 _INTENT_LABELS: dict[str, str] = {
-    "GENERATE_ACCOUNT_STATEMENT": "Account Statement",
-    "OPEN_DEPOSIT": "Open Deposit",
+    "ADD_BENEFICIARY": "Add Beneficiary",
+    "REQUEST_CREDIT_LIMIT_INCREASE": "Credit Limit Increase",
 }
 
 _STAGE_STEP: dict[str, int] = {
@@ -113,7 +113,7 @@ _CONFIRM_WORDS = frozenset({
 })
 
 _STAGE_EXPECTATIONS: dict[str, str] = {
-    "EXTRACT_FIELDS": "field values for the banking workflow (e.g. customer_id, amounts, dates)",
+    "EXTRACT_FIELDS": "field values for the banking workflow (e.g. customer_id, beneficiary or card details, amounts)",
     "SEND_EMAIL": "explicit confirmation to send (e.g. 'SEND', 'yes') or field changes",
     "WAITING_FOR_BACKGROUND_CHECK": "no user input expected; waiting for an external background check result",
     "DENIED": "the background check was denied; the workflow is permanently terminated",
@@ -150,11 +150,11 @@ _STAGE_INSTRUCTIONS: dict[str, str] = {
     ),
     "CLASSIFY_INTENT": (
         "The user's request does not match any supported operation. "
-        "You can ONLY help with: (1) generating account statements, or "
-        "(2) opening deposits. You CANNOT help with anything else — do NOT "
-        "pretend you can handle unsupported requests such as money transfers, "
-        "payments, loan applications, or any other banking operation. "
-        "Politely explain what you CAN do and ask the user to choose."
+        "You can ONLY help with: (1) adding a new beneficiary / payee, or "
+        "(2) requesting a credit limit increase. You CANNOT help with anything "
+        "else — do NOT pretend you can handle unsupported requests such as "
+        "money transfers, payments, loan applications, or any other banking "
+        "operation. Politely explain what you CAN do and ask the user to choose."
     ),
     "WAITING_FOR_BACKGROUND_CHECK": (
         "A mandatory background check is currently in progress. The user "
@@ -261,10 +261,10 @@ async def _llm_classify_intent(llm: Any, text: str) -> dict[str, Any]:
     system = (
         "You are a banking assistant. Classify the user's intent.\n\n"
         "Possible intents:\n"
-        "- GENERATE_ACCOUNT_STATEMENT: user wants to generate or receive an account statement\n"
-        "- OPEN_DEPOSIT: user wants to open a new deposit\n\n"
+        "- ADD_BENEFICIARY: user wants to add a new beneficiary / payee\n"
+        "- REQUEST_CREDIT_LIMIT_INCREASE: user wants to request a higher credit limit\n\n"
         "If the message doesn't clearly match either intent, return UNKNOWN.\n\n"
-        'Return ONLY a JSON object, e.g.: {"intent": "OPEN_DEPOSIT"}'
+        'Return ONLY a JSON object, e.g.: {"intent": "REQUEST_CREDIT_LIMIT_INCREASE"}'
     )
     try:
         response = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=text)])
@@ -303,8 +303,8 @@ async def _llm_extract_fields(
         "CRITICAL: You MUST use EXACTLY the field names listed above as JSON "
         "keys. Do NOT invent your own key names or use synonyms. Map the "
         "user's natural language to the exact required field name. For example, "
-        "if the required field is 'term_months', use 'term_months' as the key "
-        "even if the user says 'term length', 'duration', or 'months'.\n\n"
+        "if the required field is 'sort_code', use 'sort_code' as the key "
+        "even if the user says 'sort code', 'branch code', or 'routing'.\n\n"
         "Return ONLY a JSON object with field names as keys and extracted values "
         "as strings. If the message contains no field values, return {}."
     )
@@ -369,8 +369,8 @@ async def _llm_generate_response(llm: Any, state: WorkflowState) -> str:
 
     system = (
         "You are a friendly banking assistant.\n"
-        "You can ONLY help with two operations: generating account statements "
-        "and opening deposits. You have NO other capabilities. NEVER offer to "
+        "You can ONLY help with two operations: adding a new beneficiary / payee "
+        "and requesting a credit limit increase. You have NO other capabilities. NEVER offer to "
         "help with operations you cannot perform.\n\n"
         + role_instruction
         + "\n\nCurrent state:\n"
@@ -759,7 +759,7 @@ def build_graph(checkpointer=None, llm=None):
         if llm:
             parsed = await _llm_classify_intent(llm, text)
             intent = parsed.get("intent", "").upper()
-            if intent in ("GENERATE_ACCOUNT_STATEMENT", "OPEN_DEPOSIT"):
+            if intent in ("ADD_BENEFICIARY", "REQUEST_CREDIT_LIMIT_INCREASE"):
                 new_stage = "GET_TEMPLATE"
                 return {
                     "stage": new_stage,

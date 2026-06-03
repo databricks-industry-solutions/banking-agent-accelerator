@@ -340,7 +340,7 @@ The `chat` table (`packages/db/src/schema.ts`) has three columns beyond the upst
 | Column | Type | Purpose |
 |---|---|---|
 | `stage` | `varchar(64)` | Current workflow stage (e.g. `EXTRACT_FIELDS`, `DONE`) |
-| `intent` | `varchar(128)` | Classified banking intent (`GENERATE_ACCOUNT_STATEMENT` or `OPEN_DEPOSIT`) |
+| `intent` | `varchar(128)` | Classified banking intent (`ADD_BENEFICIARY` or `REQUEST_CREDIT_LIMIT_INCREASE`) |
 | `customerName` | `varchar(256)` | Customer identifier extracted during the workflow |
 
 After any schema change, regenerate and apply migrations:
@@ -356,11 +356,11 @@ Two components are customized to surface workflow state:
 
 **Filter bar** (`client/src/components/sidebar-history.tsx`): adds three controls above the chat list:
 - **Status toggle** — filter by **Open** (in-progress), **Waiting** (awaiting background check), **Received** (background check result ready), or deselect for all
-- **Intent dropdown** — filter by "Account Statement" or "Open Deposit"
+- **Intent dropdown** — filter by "Add Beneficiary" or "Credit Limit Increase"
 - **Customer search** — free-text substring search on customer name
 
 **Workflow badges** (`client/src/components/sidebar-history-item.tsx`): displayed under each chat title, showing:
-- Intent label (e.g. "Statement", "Deposit")
+- Intent label (e.g. "Beneficiary", "Credit Limit")
 - Step progress (e.g. "3/8") or terminal status: **Done**, **Waiting** (pulse animation), **Received**, **Denied**, or **Error**
 - Customer name (truncated)
 
@@ -371,7 +371,7 @@ Two components are customized to surface workflow state:
 | Parameter | Values | Description |
 |---|---|---|
 | `status` | `open`, `waiting`, `received`, `all` | Filter by workflow status (`open` = in-progress, `waiting` = awaiting background check, `received` = result ready) |
-| `intent` | e.g. `GENERATE_ACCOUNT_STATEMENT` | Filter by classified intent |
+| `intent` | e.g. `ADD_BENEFICIARY` | Filter by classified intent |
 | `customer` | free text | Substring search on customer name (case-insensitive) |
 
 ### Internal webhook
@@ -388,9 +388,9 @@ The following files contain the banking-assistant branding and copy — swap the
 
 | File | Customization |
 |---|---|
-| `client/src/components/app-sidebar.tsx` | Sidebar header: "Private Banking Assistant" |
-| `client/src/components/greeting.tsx` | Greeting: "Which private banking action can I support you with today?" |
-| `client/src/components/suggested-actions.tsx` | Suggested actions: "Open Deposit", "Generate Account Statement" |
+| `client/src/components/app-sidebar.tsx` | Sidebar header: "Banking Assistant" |
+| `client/src/components/greeting.tsx` | Greeting: "Which banking action can I support you with today?" |
+| `client/src/components/suggested-actions.tsx` | Suggested actions: "Request a credit limit increase", "Add a new beneficiary" |
 
 ## Known limitations
 

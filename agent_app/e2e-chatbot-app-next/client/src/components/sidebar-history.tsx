@@ -51,8 +51,8 @@ type StatusFilter = 'open' | 'waiting' | 'received' | 'all';
 
 const INTENT_OPTIONS = [
   { value: '', label: 'All intents' },
-  { value: 'GENERATE_ACCOUNT_STATEMENT', label: 'Account Statement' },
-  { value: 'OPEN_DEPOSIT', label: 'Open Deposit' },
+  { value: 'ADD_BENEFICIARY', label: 'Add Beneficiary' },
+  { value: 'REQUEST_CREDIT_LIMIT_INCREASE', label: 'Credit Limit Increase' },
 ];
 
 interface FilterState {

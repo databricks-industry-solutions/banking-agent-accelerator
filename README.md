@@ -1,6 +1,6 @@
 # Deterministic Stateful Agent with Async Human-in-the-Loop
 
-A reference implementation of a **deterministic, stage-driven LangGraph agent** that pauses for an **asynchronous human-in-the-loop (HIL) step** and resumes automatically when the external result arrives. The reference domain is a **private banking assistant** (account statements, opening deposits, AML-style background checks), but the underlying pattern applies to any regulated workflow that combines LLM-powered natural language handling with deterministic business logic and long-running external dependencies.
+A reference implementation of a **deterministic, stage-driven LangGraph agent** that pauses for an **asynchronous human-in-the-loop (HIL) step** and resumes automatically when the external result arrives. The reference domain is a **private banking assistant** (adding beneficiaries, credit-limit-increase requests, AML-style background checks), but the underlying pattern applies to any regulated workflow that combines LLM-powered natural language handling with deterministic business logic and long-running external dependencies.
 
 ## Why this exists
 
@@ -49,10 +49,10 @@ For a full state-machine diagram and stage-by-stage walkthrough see [`agent_app/
 
 ## Reference implementation: private banking
 
-The included demo implements a private-banking assistant with two intents:
+The included demo implements a private-banking assistant with two intents. Both run the same flow: collect the required fields, then **submit a mandatory background check (async HIL)**; wait; on approval render an email and send; on denial terminate the workflow.
 
-- `GENERATE_ACCOUNT_STATEMENT` — collect `customer_id`, `account_id`, period dates; render an email; send.
-- `OPEN_DEPOSIT` — collect `customer_id`, `amount`, `currency`, `term_months`, `payout_account`; **submit a mandatory background check (async HIL)**; wait; on approval render email and send; on denial terminate the workflow.
+- `ADD_BENEFICIARY` — collect `customer_id`, `beneficiary_name`, `beneficiary_account`, `sort_code`.
+- `REQUEST_CREDIT_LIMIT_INCREASE` — collect `customer_id`, `card_id`, `amount`, `currency`, `reason`.
 
 An 8-stage state machine (`START → CLASSIFY_INTENT → GET_TEMPLATE → ASK_FOR_FIELDS ↔ EXTRACT_FIELDS → LOOKUP_CUSTOMER_EMAIL → CUSTOMER_BACKGROUND_CHECK → WAITING_FOR_BACKGROUND_CHECK → CONFIRM → SEND_EMAIL → DONE`) drives the UI's step-progress badge and filter controls.
 
