@@ -47,7 +47,7 @@
     "tailwind-merge": "^2.5.2",
     "use-stick-to-bottom": "^1.1.1",
     "usehooks-ts": "^3.1.0",
-    "zod": "^4.3.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@chat-template/auth": "*",

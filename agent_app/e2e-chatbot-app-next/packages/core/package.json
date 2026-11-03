@@ -50,6 +50,6 @@
     "@chat-template/db": "*",
     "@chat-template/utils": "*",
     "date-fns": "^4.1.0",
-    "zod": "^4.3.5"
+    "zod": "^4.6.7"
   }
 }
